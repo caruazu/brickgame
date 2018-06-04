@@ -5,7 +5,7 @@
 //funções
 int velocidade ();
 void girar ();
-int confere ();
+bool confere ();
 void control ();
 void apagarlinha ();
 void criaforma ();
@@ -20,9 +20,15 @@ const int WIDTH= 300, HEIGHT=700, LIN=20, COL =10, WDT=25, NPART=4;
 bool rodando= true;
 //pedras do jogo
 int i,j;
+int cor=0;
 int passo = 0;
-int nTimer= 60;
-int tipopeca= 0;
+float pos_x=0;
+int newPart= 0;
+int nextPartX[4]={0};
+int nextPartY[4]={0};
+int nextPartCor= 0;
+int nTimer= 6;
+int tipopeca= 5;
 int grade [20][10]= {0};
 int peca [7][4]=
 {
@@ -38,15 +44,17 @@ int peca [7][4]=
 ALLEGRO_SAMPLE *intro, *mover, *linha, *cair, *virar;
 ALLEGRO_BITMAP *buffer, *itens,*bitmap;
 ALLEGRO_DISPLAY *display = NULL;
-ALLEGRO_EVENT_QUEUE *queue = NULL;
+ALLEGRO_EVENT_QUEUE *queue, *bunda = NULL;
 ALLEGRO_TIMER *timer = NULL;
+ALLEGRO_KEYBOARD_STATE keyState;
 
 int main(int argc, char **argv)
 {
 	//inicialização
 	al_install_system(ALLEGRO_VERSION_INT, atexit);	
 	al_install_keyboard();
-	criaforma(); //monta formas
+	al_get_keyboard_state(&keyState);
+
 	//variaveis locais
 	timer = al_create_timer((1.0/60));
 	display = al_create_display(WIDTH,HEIGHT);
@@ -69,26 +77,30 @@ int main(int argc, char **argv)
 	al_register_event_source(queue, al_get_display_event_source(display));
 	al_register_event_source(queue, al_get_keyboard_event_source());
 	al_register_event_source(queue, al_get_timer_event_source(timer));
-
-	al_init_image_addon();
 	
 	al_start_timer(timer);
+
 	while(rodando)
 	{
+		control();
+		
 		ALLEGRO_EVENT evento;
 		al_wait_for_event(queue, &evento);
-			
+		
 		if(evento.type == ALLEGRO_EVENT_TIMER)
-		{
-			velocidade();
+		{			
+			
+			velocidade();			
 			al_clear_to_color(al_map_rgb(255,0,0));
-			for (int i = 0; i < NPART; i++)
-			{
+			for (i = 0; i < NPART; i++)
+			{				
+				criaforma(); //monta formas
 				al_draw_bitmap(bitmap, posicao_a[i].x*WDT, posicao_a[i].y*WDT, 0);
-			}			
+			}
+			pos_x=0;
 			al_flip_display();
 		}
-		
+
 		if(evento.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
 		{
 			rodando= false;
@@ -102,23 +114,61 @@ int main(int argc, char **argv)
 	al_destroy_event_queue(queue);
 	return 0;
 }
-void criaforma()
-{
-	for (int i = 0; i < NPART; i++)
-	{
-		posicao_a[i].x = peca[tipopeca][i] % 2;
-		posicao_a[i].y = peca[tipopeca][i] / 2;
+void control (){
+	al_get_keyboard_state(&keyState);
+	if (al_key_down(&keyState,ALLEGRO_KEY_LEFT)){pos_x = -1;printf("control\n");}
+	else if (al_key_down(&keyState,ALLEGRO_KEY_RIGHT)){pos_x = 1;}
+
+	for (i = 0; i < NPART; i++){
+		posicao_b[i]=posicao_a[i];
+		posicao_a[i].x += pos_x;
+	}
+
+	if (!confere()){
+		for (i = 0; i < NPART; i++)	posicao_a[i]=posicao_b[i];
+	}
+
+}
+bool confere (){
+	for (i = 0; i < NPART; i++){
+		if (posicao_a[i].x < 0 || posicao_a[i].x >= COL) return false;
+		else if (posicao_a[i].y>= LIN|| grade[posicao_a[i].y][posicao_a[i].x] ){
+			return false;
+		}
+		return true;
 	}
 }
-int velocidade ()
-{
-	if (passo++ > nTimer)
-	{
-		for (int i = 0; i < NPART; ++i)
-		{
+
+int velocidade (){
+	if (passo++ > nTimer){
+		for (i = 0; i < NPART; i++){
 			posicao_b[i]=posicao_a[i];
 			posicao_a[i].y +=1;
 		}
+		criaforma();
 		passo = 0;
 	}
+}
+void criaforma(){
+	if (!confere){
+		for (i = 0; i < NPART; i++) 
+		{
+			
+			grade[posicao_b[i].y][posicao_b[i].x] = cor;
+		}
+		tipopeca= rand()%7;
+		if (newPart){
+			cor=nextPartCor;
+			for (i = 0; i < NPART; i++){
+				posicao_a[i].x = nextPartX[i];
+				posicao_a[i].y = nextPartY[i];
+			}
+		}
+		nextPartCor = tipopeca+1;
+		for (i = 0; i < NPART; i++){
+			nextPartX[i] = peca[tipopeca][i] % 2;
+			nextPartY[i] = peca[tipopeca][i] / 2;
+		}
+		newPart=1;
+	}	
 }
